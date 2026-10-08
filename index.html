@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>워크인 무비 클로짓</title>
+<meta name="description" content="선반에 꽂힌 책등을 둘러보며 영화를 고르는 워크인 클로짓. 드래그로 고개를 돌리고, 케이스를 꺼내 정보를 읽어보세요.">
+<meta property="og:title" content="워크인 무비 클로짓">
+<meta property="og:description" content="세 벽 가득한 책등 사이에서 영화를 꺼내 보는 3D 클로짓.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
+<style>
+  :root{ --panel-bg:#17171a; --line:#2c2c31; --fg:#ece7dc; --muted:#9a948a; --accent:#c99a2e; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:#2e2e32; color:var(--fg);
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; }
+  #scene{ position:fixed; inset:0; touch-action:none; }
+  .topbar{ position:fixed; top:12px; z-index:20; display:flex; gap:8px; }
+  .topbar.left{ left:12px; }
+  .topbar.right{ right:12px; }
+  .topbar input, .topbar button{ font:inherit; border:1px solid var(--line); background:rgba(23,23,26,.82);
+    color:var(--fg); border-radius:999px; padding:9px 14px; cursor:pointer; backdrop-filter:blur(6px); }
+  .topbar input{ width:190px; cursor:text; }
+  .topbar button:hover{ border-color:var(--accent); }
+  .topbar button.active{ background:var(--accent); color:#1a1a1a; border-color:var(--accent); font-weight:700; }
+  #tip{ position:fixed; left:50%; bottom:52px; transform:translateX(-50%); z-index:15;
+    background:rgba(23,23,26,.9); border:1px solid var(--line); border-radius:999px; padding:9px 18px;
+    font-size:14px; white-space:nowrap; display:none; pointer-events:none; backdrop-filter:blur(6px); }
+  #panel{ position:fixed; top:0; right:0; height:100%; width:370px; max-width:88vw; z-index:30;
+    background:var(--panel-bg); border-left:1px solid var(--line); transform:translateX(105%);
+    transition:transform .4s cubic-bezier(.2,.7,.2,1); overflow-y:auto; padding:58px 26px 90px; }
+  #panel.open{ transform:translateX(0); }
+  #panel .close{ position:absolute; top:14px; right:16px; background:none; border:none; color:var(--muted);
+    font-size:26px; line-height:1; cursor:pointer; }
+  #panel h2{ margin:0 0 4px; font-size:26px; }
+  #panel .orig{ color:var(--muted); font-size:15px; margin-bottom:20px; font-style:italic; }
+  #panel .row{ border-top:1px solid var(--line); padding:14px 0; }
+  #panel .k{ font-size:12px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; margin-bottom:6px; }
+  #panel .v{ font-size:15px; line-height:1.6; }
+  #panel .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  #panel .chip{ border:1px solid var(--line); border-radius:999px; padding:3px 11px; font-size:13px; }
+  #panel .score b{ color:var(--accent); font-size:19px; }
+  #panel a.tmdb{ display:inline-block; margin-top:4px; color:#1a1a1a; background:var(--accent);
+    text-decoration:none; padding:9px 16px; border-radius:999px; font-weight:700; font-size:14px; }
+  #list{ position:fixed; inset:0; z-index:25; background:#242428; overflow-y:auto; display:none;
+    padding:72px 20px 80px; }
+  #list .grid{ max-width:1040px; margin:0 auto; display:grid; gap:14px;
+    grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+  #list .card{ background:var(--panel-bg); border:1px solid var(--line); border-radius:14px; padding:16px;
+    cursor:pointer; transition:border-color .15s,transform .15s; }
+  #list .card:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  #list .card .no{ color:var(--accent); font-weight:700; font-size:13px; }
+  #list .card h3{ margin:4px 0 2px; font-size:18px; }
+  #list .card .o{ color:var(--muted); font-size:13px; font-style:italic; }
+  #list .card .meta{ margin-top:8px; font-size:13px; color:var(--muted); }
+  #list .card .ov{ margin-top:8px; font-size:13px; line-height:1.5; color:#cdc7bb;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  #attr{ position:fixed; left:50%; bottom:8px; transform:translateX(-50%); z-index:10;
+    font-size:11px; color:var(--muted); text-align:center; width:94%; pointer-events:none; line-height:1.4; }
+  #loading{ position:fixed; inset:0; display:grid; place-items:center; z-index:40; color:var(--muted); font-size:15px; }
+  @media (max-width:640px){
+    .topbar{ top:8px; gap:6px; }
+    .topbar.left{ left:8px; right:8px; }
+    .topbar.right{ top:8px; right:8px; }
+    .topbar input{ width:100%; flex:1; padding:7px 12px; font-size:13px; }
+    .topbar button{ padding:7px 11px; font-size:13px; white-space:nowrap; }
+    #panel{ top:auto; bottom:0; height:auto; width:100%; max-width:100%; max-height:66%;
+      border-left:none; border-top:1px solid var(--line); border-radius:18px 18px 0 0;
+      transform:translateY(105%); padding:34px 20px 70px; }
+    #panel.open{ transform:translateY(0); }
+    #tip{ bottom:72px; font-size:13px; max-width:90vw; white-space:normal; text-align:center; }
+    #attr{ font-size:10px; bottom:6px; }
+  }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div class="topbar left">
+  <input id="q" type="search" placeholder="영화 검색 (Enter)" autocomplete="off">
+  <button id="rand" title="무작위로 꺼내기">🎲 무작위</button>
+</div>
+<div class="topbar right">
+  <button id="btnCloset" class="active">클로짓 보기</button>
+  <button id="btnList">목록 보기</button>
+</div>
+<div id="tip"></div>
+<aside id="panel"><button class="close" aria-label="닫기">×</button><div id="panelBody"></div></aside>
+<div id="list"><div class="grid" id="listGrid"></div></div>
+<div id="attr">영화 정보: TMDB (This product uses the TMDB API but is not endorsed or certified by TMDB.)</div>
+<div id="loading">클로짓을 여는 중…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const FZ=-2.8, LX=-3.3, RX=3.3, DZ=2.6, H=3.5;
+const SW=0.2, SH=0.44, SD=0.1, GAP=0.03, SLOT=SW+GAP;
+const shelfY=[]; for(let i=0;i<7;i++) shelfY.push(0.32+i*((H-0.6)/6));
+const EYE=shelfY[3];
+
+const palette=['#f1ede2','#e6d8b8','#9a9a93','#a83232','#243a66','#2b6e6a','#c99a2e','#b8b3a6','#7a2233','#1f4e79'];
+const fw1=['Silent','Golden','Last','Broken','Velvet','Northern','Pale','Crimson','Hidden','Electric','Autumn','Distant','Quiet','Burning','Hollow','Midnight','Lost','Iron','Paper','Winter','Secret','Wild','Glass','Red'];
+const fw2=['River','Harbor','Signal','Garden','Engine','Letter','Mirror','Orchard','Station','Comet','Harvest','Lantern','Current','Echo','Tenant','Voyage','Cinema','Circuit','Meridian','Ledger','Shore','Hour','Needle','Bloom'];
+
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
+function lum(h){ const [r,g,b]=hexToRgb(h); return (0.299*r+0.587*g+0.114*b)/255; }
+function ink(h){ return lum(h)>0.6?'#1b1b1b':'#f5f1e7'; }
+function shade(h,f){ const [r,g,b]=hexToRgb(h); const m=c=>Math.max(0,Math.min(255,Math.round(c*f)));
+  return '#'+[m(r),m(g),m(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function pad3(n){ return String(n).padStart(3,'0'); }
+
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function makeTexture(no,title,bg,mode){
+  const W=128,Hc=300, c=document.createElement('canvas'); c.width=W; c.height=Hc;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,Hc);
+  ctx.fillStyle=shade(bg,0.82); ctx.fillRect(0,0,6,Hc); ctx.fillRect(W-6,0,6,Hc);
+  ctx.fillStyle='#f6f3ec'; roundRect(ctx,10,10,W-20,50,9); ctx.fill();
+  ctx.fillStyle='#1c1c1c'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  let fs=30; ctx.font='bold '+fs+'px sans-serif';
+  while(ctx.measureText('#'+no).width>W-34 && fs>12){ fs--; ctx.font='bold '+fs+'px sans-serif'; }
+  ctx.fillText('#'+no,W/2,37);
+  const top=76, areaH=Hc-top-14, cx=W/2; ctx.fillStyle=ink(bg);
+  if(mode==='kr'){
+    const chars=[...title.replace(/\s+/g,'')]; const n=chars.length||1;
+    let ch=Math.min(areaH/n, 92); ch=Math.max(ch,10);
+    for(let k=0;k<n;k++){ let s=ch*0.96; ctx.font='bold '+s+'px sans-serif';
+      while(ctx.measureText(chars[k]).width>W-20 && s>10){ s-=2; ctx.font='bold '+s+'px sans-serif'; }
+      ctx.fillText(chars[k], cx, top+(k+0.5)*(areaH/n)); }
+  } else {
+    ctx.save(); ctx.translate(cx, top+areaH/2); ctx.rotate(Math.PI/2);
+    let s=60; ctx.font='bold '+s+'px sans-serif';
+    while(ctx.measureText(title).width>areaH*0.92 && s>10){ s-=2; ctx.font='bold '+s+'px sans-serif'; }
+    while(s>84){ s=84; ctx.font='bold '+s+'px sans-serif'; }
+    ctx.fillText(title,0,0); ctx.restore();
+  }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=4;
+  t.generateMipmaps=false; t.minFilter=THREE.LinearFilter; return t;
+}
+
+function spineMats(tex,bg){
+  const side=new THREE.MeshBasicMaterial({color:new THREE.Color(shade(bg,0.7))});
+  const face=new THREE.MeshBasicMaterial({map:tex});
+  return [side,side,side,side,face,side];
+}
+
+const scene=new THREE.Scene(); scene.background=new THREE.Color('#2b2b30');
+const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,0.01,100);
+camera.position.set(0,EYE,0.12);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+document.getElementById('scene').appendChild(renderer.domElement);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.target.set(0,EYE,0);
+controls.enableZoom=false; controls.enablePan=false;
+controls.enableDamping=true; controls.dampingFactor=0.08;
+controls.rotateSpeed=-0.28;
+controls.minDistance=0.12; controls.maxDistance=0.12;
+controls.minPolarAngle=Math.PI*0.28; controls.maxPolarAngle=Math.PI*0.72;
+
+const wallMat=new THREE.MeshBasicMaterial({color:'#3a3a3f'});
+const boardMat=new THREE.MeshBasicMaterial({color:'#303033'});
+function addWall(w,h,x,y,z,ry){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wallMat);
+  m.position.set(x,y,z); m.rotation.y=ry; scene.add(m); }
+addWall(6.8,H,0,H/2,FZ,0);
+addWall(5.6,H,LX,H/2,0,Math.PI/2);
+addWall(5.6,H,RX,H/2,0,-Math.PI/2);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(7,5.6),new THREE.MeshBasicMaterial({color:'#26262a'}));
+floor.rotation.x=-Math.PI/2; floor.position.y=0.001; scene.add(floor);
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(7,5.6),new THREE.MeshBasicMaterial({color:'#4c4c52'}));
+ceil.rotation.x=Math.PI/2; ceil.position.y=H-0.001; scene.add(ceil);
+
+for(let i=0;i<7;i++){ const by=shelfY[i]-SH/2-0.02;
+  let b=new THREE.Mesh(new THREE.BoxGeometry(6.6,0.03,0.34),boardMat); b.position.set(0,by,FZ+0.18); scene.add(b);
+  b=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,5.4),boardMat); b.position.set(LX+0.18,by,0); scene.add(b);
+  b=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,5.4),boardMat); b.position.set(RX-0.18,by,0); scene.add(b);
+}
+
+const geo=new THREE.BoxGeometry(SW,SH,SD);
+const realMeshes=[]; let pulledMesh=null;
+
+function fakePool(){
+  const pool=[]; for(let i=0;i<120;i++){ const bg=palette[i%palette.length];
+    const title=fw1[i%fw1.length]+' '+fw2[(i*7)%fw2.length];
+    const no=pad3(((i*13)%480)+1);
+    pool.push(spineMats(makeTexture(no,title,bg,'en'),bg)); }
+  return pool;
+}
+
+function positions(len,span){ const n=Math.max(1,Math.floor(span/SLOT)); const arr=[];
+  const start=-((n-1)/2)*SLOT; for(let k=0;k<n;k++) arr.push(start+k*SLOT); return arr; }
+
+function build(films){
+  const pool=fakePool(); const pick=()=>pool[Math.floor(Math.random()*pool.length)];
+  const addSpine=(mats,x,y,z,ry,film)=>{ const m=new THREE.Mesh(geo,mats);
+    m.position.set(x,y,z); m.rotation.y=ry; m.userData.base=new THREE.Vector3(x,y,z); scene.add(m);
+    if(film){ m.userData.film=film; film.mesh=m; realMeshes.push(m); } };
+
+  for(let i=0;i<7;i++){ const y=shelfY[i];
+    const xs=positions(0,6.4);
+    if(i===3){ const n=xs.length; const rn=films.length; const s=Math.floor((n-rn)/2);
+      for(let k=0;k<n;k++){ const ri=k-s;
+        if(ri>=0 && ri<rn){ const f=films[ri];
+          addSpine(spineMats(makeTexture(pad3(f.no),f.title,f.color,'kr'),f.color), xs[k],y,FZ+SD/2+0.19,0,f); }
+        else addSpine(pick(), xs[k],y,FZ+SD/2+0.19,0,null); }
+    } else { for(const x of xs) addSpine(pick(), x,y,FZ+SD/2+0.19,0,null); }
+  }
+  for(let i=0;i<7;i++){ const y=shelfY[i]; const zs=positions(0,5.2);
+    for(const z of zs){ addSpine(pick(), LX+SD/2+0.19,y,z,Math.PI/2,null);
+      addSpine(pick(), RX-SD/2-0.19,y,z,-Math.PI/2,null); } }
+}
+
+const ray=new THREE.Raycaster(); const ptr=new THREE.Vector2();
+const tip=document.getElementById('tip');
+let hovered=null;
+
+function setPointer(e){ ptr.x=(e.clientX/innerWidth)*2-1; ptr.y=-(e.clientY/innerHeight)*2+1; }
+
+renderer.domElement.addEventListener('pointermove',e=>{
+  if(listOpen) return; setPointer(e); ray.setFromCamera(ptr,camera);
+  const hit=ray.intersectObjects(realMeshes,false);
+  if(hit.length){ const f=hit[0].object.userData.film; hovered=f;
+    tip.style.display='block';
+    tip.textContent='#'+pad3(f.no)+'  ·  '+f.title+'  ·  '+f.release+'  ·  ★'+f.score;
+    renderer.domElement.style.cursor='pointer';
+  } else { hovered=null; tip.style.display='none'; renderer.domElement.style.cursor='grab'; }
+});
+
+let downXY=null;
+renderer.domElement.addEventListener('pointerdown',e=>{ downXY=[e.clientX,e.clientY]; });
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!downXY||listOpen) return; const dx=e.clientX-downXY[0], dy=e.clientY-downXY[1];
+  if(Math.hypot(dx,dy)>6){ downXY=null; return; } downXY=null;
+  setPointer(e); ray.setFromCamera(ptr,camera);
+  const hit=ray.intersectObjects(realMeshes,false);
+  if(hit.length) select(hit[0].object.userData.film);
+});
+
+function select(film){
+  if(listOpen) showCloset();
+  pulledMesh=film.mesh; showPanel(film);
+}
+
+function showPanel(f){
+  const esc=s=>String(s).replace(/</g,'&lt;');
+  let html='<h2>'+esc(f.title)+'</h2><div class="orig">'+esc(f.original)+'</div>';
+  html+='<div class="row"><div class="k">개봉일</div><div class="v">'+esc(f.release)+'</div></div>';
+  html+='<div class="row"><div class="k">장르</div><div class="v chips">'+f.genres.map(g=>'<span class="chip">'+esc(g)+'</span>').join('')+'</div></div>';
+  html+='<div class="row score"><div class="k">TMDB 평점</div><div class="v"><b>★ '+f.score+'</b> &nbsp;<span style="color:var(--muted)">('+Number(f.votes).toLocaleString()+' votes)</span></div></div>';
+  if(f.overview && f.overview.trim()) html+='<div class="row"><div class="k">줄거리</div><div class="v">'+esc(f.overview)+'</div></div>';
+  if(f.note && f.note.trim()) html+='<div class="row"><div class="k">한 줄 감상</div><div class="v">'+esc(f.note)+'</div></div>';
+  html+='<div class="row"><a class="tmdb" href="'+esc(f.tmdb)+'" target="_blank" rel="noopener">TMDB에서 보기 ↗</a></div>';
+  document.getElementById('panelBody').innerHTML=html;
+  document.getElementById('panel').classList.add('open');
+}
+function closePanel(){ document.getElementById('panel').classList.remove('open'); pulledMesh=null; }
+document.querySelector('#panel .close').addEventListener('click',closePanel);
+
+let FILMS=[], listOpen=false;
+const listEl=document.getElementById('list'), gridEl=document.getElementById('listGrid');
+const btnCloset=document.getElementById('btnCloset'), btnList=document.getElementById('btnList');
+
+function renderList(filter){
+  const esc=s=>String(s).replace(/</g,'&lt;'); const q=(filter||'').trim().toLowerCase();
+  gridEl.innerHTML=FILMS.filter(f=> !q || f.title.toLowerCase().includes(q) || f.original.toLowerCase().includes(q))
+    .map(f=>'<div class="card" data-id="'+f.id+'"><div class="no">#'+pad3(f.no)+'</div>'
+      +'<h3>'+esc(f.title)+'</h3><div class="o">'+esc(f.original)+'</div>'
+      +'<div class="meta">'+esc(f.release)+' · ★'+f.score+' · '+f.genres.join(', ')+'</div>'
+      +(f.overview&&f.overview.trim()?'<div class="ov">'+esc(f.overview)+'</div>':'')+'</div>').join('');
+  gridEl.querySelectorAll('.card').forEach(c=>c.addEventListener('click',()=>{
+    const f=FILMS.find(x=>x.id==c.dataset.id); select(f); }));
+}
+function showList(){ listOpen=true; listEl.style.display='block'; btnList.classList.add('active');
+  btnCloset.classList.remove('active'); tip.style.display='none'; renderList(document.getElementById('q').value); }
+function showCloset(){ listOpen=false; listEl.style.display='none'; btnCloset.classList.add('active');
+  btnList.classList.remove('active'); }
+btnList.addEventListener('click',showList); btnCloset.addEventListener('click',showCloset);
+
+const q=document.getElementById('q');
+q.addEventListener('input',()=>{ if(listOpen) renderList(q.value); });
+q.addEventListener('keydown',e=>{ if(e.key!=='Enter') return; const s=q.value.trim().toLowerCase(); if(!s) return;
+  const f=FILMS.find(x=>x.title.toLowerCase().includes(s)||x.original.toLowerCase().includes(s));
+  if(f) select(f); });
+document.getElementById('rand').addEventListener('click',()=>{ if(!FILMS.length) return;
+  select(FILMS[Math.floor(Math.random()*FILMS.length)]); });
+
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); });
+
+const _v=new THREE.Vector3();
+function animate(){ requestAnimationFrame(animate); controls.update();
+  for(const m of realMeshes){ const base=m.userData.base;
+    _v.copy(base); if(m===pulledMesh) _v.z+=0.3;
+    m.position.lerp(_v,0.18); }
+  renderer.render(scene,camera);
+}
+
+fetch('./films.json').then(r=>r.json()).then(data=>{
+  FILMS=data.map((f,i)=>({...f,no:i+1}));
+  build(FILMS); renderList('');
+  document.getElementById('loading').style.display='none';
+  animate();
+}).catch(err=>{ document.getElementById('loading').textContent='films.json을 불러오지 못했습니다.'; console.error(err); });
+</script>
+</body>
+</html>
